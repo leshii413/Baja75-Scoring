@@ -1,0 +1,9 @@
+Baja75 Scoring Management System v1.0.1
+
+1. Double-click "Start Baja75 Scoring.cmd". The app opens in your browser at http://localhost:7575/
+2. In Microsoft Edge: ... menu > Apps > Install this site as an app. It then opens from the Start menu.
+3. Always use the same address: your data is kept by the browser for that address.
+4. Settings / Backup > Download backup now and then (and to move your data to another device).
+
+Android: put the "app" folder on an https:// web host and install it from Chrome (see "About and install.md").
+How to score a race: "User Guide.md".

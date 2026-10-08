@@ -1,0 +1,7 @@
+2026-10-07 08:38:06 UTC+08:00 (Malay Peninsula Standard Time) | Map: johnson_valley | Course: route 20261007 082741 | Time: 4:16.8 | Vehicle: Hirochi Aurata Race (CVT) (utv) | Off course: 4 | Wrong way: 4 | Speeding: 5 | Missed VCPs: 0 | Jump starts: 0 | Resets: 0 | Recoveries: 2 | Time off course: 0:11.3 | Damage: 1
+  Off course 1 | At: 0:44.4 | RM: 0.55 mi | Off for: 0:02.1 | Resets: 0 | Recoveries: 0
+  Off course 2 | At: 1:48.5 | RM: 1.04 mi | Off for: 0:05.0 | Resets: 0 | Recoveries: 0
+  Off course 3 | At: 3:00.2 | RM: 1.47 mi | Off for: 0:02.5 | Resets: 0 | Recoveries: 0
+  Off course 4 | At: 3:48.7 | RM: 1.78 mi | Off for: 0:01.4 | Resets: 0 | Recoveries: 0
+  Damage 1 | At: 2:38.1 | RM: 1.37 mi | Parts: 4-Lug Front Hubs 100%, Front Halfshafts 100%, Hood 100%, Rear Right Fender 100%, Right Door 100%
+2026-10-07 08:40:00 UTC+08:00 (Malay Peninsula Standard Time) | Map: johnson_valley | Course: route 20261007 082741 | Time: DNF after 0:09.9 | Vehicle: Hirochi Aurata Race (CVT) (utv) | Off course: 0 | Wrong way: 0 | Speeding: 0 | Missed VCPs: 0 | Jump starts: 0 | Resets: 0 | Recoveries: 0 | Time off course: 0:00.0 | Damage: 0
