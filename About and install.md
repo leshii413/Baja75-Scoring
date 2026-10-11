@@ -13,7 +13,7 @@ Created by **Leshii413 | Baja75 Series** · https://www.patreon.com/c/Baja75Seri
 
 ## Windows 11: run it (no install, no Node)
 
-1. Unzip `Baja75-Scoring-Windows-v1.0.1.zip` anywhere (e.g. `Documents\Baja75 Scoring`).
+1. Unzip `Baja75-Scoring-Windows-v1.0.2.zip` anywhere (e.g. `Documents\Baja75 Scoring`).
 2. Double-click **`Start Baja75 Scoring.cmd`**. A small window opens (the local web server, this computer only) and the app
    opens in your browser at `http://localhost:7575/`.
 3. In **Microsoft Edge**: `…` menu › **Apps** › **Install this site as an app** (or the install icon in the address bar).
@@ -42,7 +42,7 @@ backup file is the same on Windows and Android. Devices don't sync by themselves
 - Node.js **^20.19.0 or ≥ 22.12.0** (what Vite 8 needs). Versions are pinned in `package-lock.json`.
 - `npm ci` · `npm run dev` (development server) · `npm test` (scoring engine tests) · `npm run build` (type check + production build into `dist/`) · `npm run preview` (serves `dist/` on http://localhost:4175).
 - Browser workflow test (Python + Playwright, Chromium): `npm run build && npm run preview &` then `python3 tests/e2e.py http://localhost:4175/`.
-- Release zips: `python3 tools/release.py` → `release/Baja75-Scoring-Windows-v1.0.1.zip` (app + launcher + guide) and `release/Baja75-Scoring-source-v1.0.1.zip`.
+- Release zips: `python3 tools/release.py` → `release/Baja75-Scoring-Windows-v1.0.2.zip` (app + launcher + guide) and `release/Baja75-Scoring-source-v1.0.2.zip`.
 
 | Folder | What |
 |---|---|
@@ -67,10 +67,16 @@ backup / restore (merge or replace), CSV exports (results, penalties, championsh
 
 Added in v1.0.1: **overrides** for changing or deleting seasons, results (runs, race events, reverting a finalized event to draft) and drivers: type OVERRIDE, give a reason, then a 5 second wait; every override is recorded in the change history. A **logo** setting (Settings / Backup › Logo). The **license** notice (Settings / Backup › License).
 
+Added in v1.0.2: **Paste results from Discord** (Import Data): results a BeamJoy Revived server posts to Discord import
+as they are, one post or many; the server name is kept as a note. **No Data Provided**: values a source doesn't have
+(Discord posts have no race number, map or penalty counts; the CSV template accepts the words in any cell) still give a
+valid, scored result (penalty counts 0), marked **MANUAL REVIEW** with *Mark as reviewed*; a missing time must be
+entered before finalizing. A ChatGPT prompt for converting Discord posts to the CSV template: `CHATGPT_DISCORD_TEMPLATE.md`.
+
 Not in this version:
 
 - **Live sync between devices.** Each device has its own data; move it with the backup file. A shared server would be needed.
 - **Watching the BeamNG folder.** The app reads files you pick, drop or paste; it can't watch a folder by itself.
 - **Aggregate multi-stage / lap events.** Each event scores one selected (or best) run per driver and class.
 - **A Windows .exe installer or an Android APK.** Installation is the browser's "install app" (PWA).
-- **Server result imports** (e.g. from BeamMP): an adapter can be added once a server's result format exists.
+- **Automatic server result imports** (a webhook straight from the BeamMP server to an online results site): planned; for now paste the Discord posts.

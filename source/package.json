@@ -1,0 +1,34 @@
+{
+  "name": "baja75-scoring",
+  "private": true,
+  "version": "1.0.2",
+  "type": "module",
+  "description": "Baja75 Scoring Management System",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview --port 4175 --strictPort",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "idb": "8.0.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "fake-indexeddb": "6.2.5",
+    "typescript": "5.9.3",
+    "vite": "8.3.3",
+    "vite-plugin-pwa": "2.0.0",
+    "vitest": "5.0.3"
+  },
+  "license": "CC-BY-NC-SA-4.0",
+  "author": "Leshii413 | Baja75 Series"
+}

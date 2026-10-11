@@ -32,6 +32,42 @@ Everything saves on its own (top right: *All changes saved on this device*). Dow
 - Missing warning counts stay **unknown** (not zero). A run log written with the damage log turned off has no Damage
   count, for example.
 
+### Results from Discord (no Navigation Unit)
+
+When a driver ran without the Navigation Unit, the result post the server sent to Discord (BeamJoy Revived webhook) is
+enough:
+
+1. In Discord, select the result post (or several posts, or a whole stretch of the channel) and copy it.
+2. **Import Data › Paste results from Discord** › paste it as it is › **Read Discord results**.
+3. Each post becomes one row named `Discord: <driver> · <server>`. The post's driver is pre-selected if exactly one
+   registered driver has that name; otherwise pick or create the driver. Pick the race event, then **Import**.
+4. Map the vehicle in **Classes & Vehicles** if it's new: Discord shows the vehicle's display name
+   (e.g. `SP Dunekicker (2008) (custom)`), which is mapped as an *exact configuration*.
+
+What the app reads from a post: driver, race title (used as the course), race time (the time under the title, never
+the best lap or the server record), vehicle, and the date from the footer (`server • 10/6/2026 1:09 PM`, read as
+month/day/year in this device's time zone; *Today* / *Yesterday* are counted from the day you import, so check those).
+Laps, best lap, leaderboard position, the server record and lines like *New server record* or *Not counted for the
+leaderboard* are kept as notes. The **server name is only a note**: any community's server works and it never needs
+review. Pasting the same post twice is caught as a duplicate.
+
+### No Data Provided
+
+A Discord post has no race number, map or penalty counts. Those are recorded as **No Data Provided** (in the manual CSV
+template you can write `No Data Provided` in any cell yourself). Such a result:
+
+- **still counts**: it is ranked and gets points, and the race can be finalized;
+- penalty counts marked No Data Provided score **0** (a *blank* count is different: it stays unknown and blocks while
+  that penalty charges time);
+- is marked **MANUAL REVIEW** on the race page. Open *Details › Source record* to see what was missing, then either
+  **Change this run…** to type in real counts (each typed value replaces its marker) or **Mark as reviewed…** to accept
+  it as it is (both recorded in the change history);
+- the one exception is the **time**: a result whose time is No Data Provided is kept but can't be ranked until you enter
+  the time with **Change this run…**, and the race can't be finalized before that.
+
+If you'd rather go through a spreadsheet, `CHATGPT_DISCORD_TEMPLATE.md` has a ChatGPT prompt that turns copied Discord
+posts into the manual CSV template.
+
 ## Classes & Vehicles
 
 - The 14 classes: Class 1, 2, 3, 4, 5, 5U, 6, 7, 8, 9, 10, 11, 15, 18. Class 5 and 5U are separate.
