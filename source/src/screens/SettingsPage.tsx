@@ -8,10 +8,11 @@ import { nowIso } from '../domain/time';
 import type { Dataset, PointsTable } from '../domain/types';
 import { askPersistent, storageStatus } from '../store/db';
 import { useStore } from '../store/store';
+import { activeSlot, refLabel, refOf } from '../domain/presets';
 import { Dialog, download, Icon, readFileText, useOverride, useToast } from '../ui/common';
 import { LogoSetting } from '../ui/Logo';
 
-export const APP_VERSION = '1.0.2';
+export const APP_VERSION = '1.0.3';
 export const PATREON_URL = 'https://www.patreon.com/c/Baja75Series';
 export const LICENSE_URL = 'https://creativecommons.org/licenses/by-nc-sa/4.0/';
 
@@ -42,6 +43,9 @@ export function SettingsPage() {
       <div className="grid two">
         <section className="panel">
           <h2>Race points</h2>
+          <p className="small">Editing the active <b>Rule Sheet: {refLabel(refOf(ds, 'rules', activeSlot(ds, 'rules')))}</b> (<a href="#/presets">Presets</a>). Draft events on another Rule Sheet keep theirs.</p>
+          <label className="field" style={{ marginBottom: 8 }}>New events start as<select value={s.defaultFormat ?? 'selected'} onChange={(e) => commit((d) => history({ ...d, settings: [{ ...d.settings[0], defaultFormat: e.target.value as 'selected' | 'best' }] }, 'default-format', 'settings', 'settings', d.settings[0].defaultFormat ?? 'selected', e.target.value, ''))}>
+            <option value="selected">Selected attempt (an official picks the run)</option><option value="best">Best adjusted attempt (time trial)</option></select></label>
           <p className="small muted">Points for class positions 1, 2, 3… then the points every later finisher gets. Non-finishers (DNF, DNS, DSQ) get {s.nonfinishPoints}. Changing this recalculates draft results only; finalized events keep the table they were finalized with.</p>
           <label className="field">Positions 1, 2, 3…<input value={pts} onChange={(e) => setPts(e.target.value)} aria-invalid={ptsErr.length > 0} /></label>
           <label className="field" style={{ marginTop: 8 }}>Every later finisher<input className="secs" value={fallback} onChange={(e) => setFallback(e.target.value)} /></label>

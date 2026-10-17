@@ -170,3 +170,15 @@ dialog .dlg-body { padding: 18px; } dialog .dlg-foot { padding: 12px 18px; borde
 .logo-preview { width: 72px; height: 72px; border: 1px solid var(--line2); border-radius: 8px; display: grid; place-items: center; background: #0f0f10; }
 .logo-preview img { max-width: 64px; max-height: 64px; object-fit: contain; }
 .season-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+
+/* presets (v1.0.3) */
+.preset-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel2); padding: 12px 14px; min-width: 0; }
+.preset-card.active { border-color: #6a3a10; box-shadow: inset 3px 0 0 var(--orange); }
+.preset-card .kv { margin: 6px 0 0; }
+.preset-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.preset-list li { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px dashed var(--line); }
+.preset-list li:last-child { border-bottom: 0; }
+.stat.warn b { color: var(--warn); }
+a.btn { color: var(--text); text-decoration: none; }
+a.btn.small, button.small { min-height: 32px; padding: 4px 10px; font-size: .85rem; }
+.sheet-line { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }

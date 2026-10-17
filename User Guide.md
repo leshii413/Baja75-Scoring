@@ -68,6 +68,32 @@ template you can write `No Data Provided` in any cell yourself). Such a result:
 If you'd rather go through a spreadsheet, `CHATGPT_DISCORD_TEMPLATE.md` has a ChatGPT prompt that turns copied Discord
 posts into the manual CSV template.
 
+## Presets: Rule, Penalty and Class Sheets
+
+**Presets** (menu) keeps three presets of each sheet:
+
+| Sheet | What it holds | Edited in |
+|---|---|---|
+| **Rule Sheet** | race points table, points for non-finishers, the format new events start with | Settings / Backup › Race points |
+| **Penalty Sheet** | seconds per occurrence for every penalty rule | Penalties › Default template |
+| **Class Sheet** | the classes and the vehicle mappings for all events | Classes & Vehicles |
+
+- One preset of each sheet is **ACTIVE**: it is what those pages edit and what new race events use. Give each preset a
+  name (e.g. *SCORE 2026*, *BITD*, *Club night*).
+- **Make active** stores what you have into the current preset, then loads the chosen one, so switching back and forth
+  loses nothing. **Copy active here** starts a preset from the one you're using (it keeps its own name).
+- **Each race event records its Rule Sheet and Penalty Sheet.** Change them in the race's **Event settings**: picking a
+  Penalty Sheet copies its rules into that event (replacing any changes made for that event; waivers and corrected counts
+  stay). An event whose penalty rules were edited afterwards shows **CHANGED FOR THIS EVENT**.
+- The **Class Sheet** is the same for every event (championships are decided within a class). Loading another Class
+  Sheet never removes a class that results already use.
+- **Finalized results never change**: they keep the points table and penalty rules they were finalized with, and record
+  which sheets those were.
+- The **Dashboard** shows the active sheets with their contents, season stats (including results needing manual review)
+  and a table of every race event with the Rule, Penalty and Class Sheet it is scored with; draft events not on the
+  active sheets are flagged **NOT ACTIVE**.
+- Data from an older version starts with Preset 1, 2 and 3 all copies of your current setup, Preset 1 active.
+
 ## Classes & Vehicles
 
 - The 14 classes: Class 1, 2, 3, 4, 5, 5U, 6, 7, 8, 9, 10, 11, 15, 18. Class 5 and 5U are separate.

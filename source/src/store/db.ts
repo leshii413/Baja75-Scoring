@@ -3,6 +3,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { seedDataset } from '../domain/actions';
 import { emptyDataset } from '../domain/backup';
+import { ensurePresets } from '../domain/presets';
 import { COLLECTIONS, SCHEMA_VERSION, type Dataset } from '../domain/types';
 
 const DB_NAME = 'baja75-scoring';
@@ -30,6 +31,13 @@ export async function loadAll(): Promise<{ ds: Dataset; fresh: boolean }> {
     const seeded = seedDataset();
     await replaceAll(seeded);
     return { ds: seeded, fresh: true };
+  }
+  if (ds.settings.length && !ds.settings[0].presets) {
+    // first start after v1.0.3: set up Preset 1-3 of each sheet from the current setup
+    const next = ensurePresets(ds);
+    const tx2 = d.transaction(['settings'], 'readwrite');
+    await Promise.all([tx2.objectStore('settings').put(next.settings[0]), tx2.done]);
+    return { ds: next, fresh: false };
   }
   return { ds, fresh: false };
 }

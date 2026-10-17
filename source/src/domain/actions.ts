@@ -5,9 +5,10 @@ import { COL_METRIC } from './csv';
 import { SEED_CLASSES } from './classes';
 import { uuid } from './ids';
 import { copyRulesForEvent, templateRules } from './penalties';
+import { copyActiveInto, ensurePresets, eventRuleSheet, eventSlots, newEventDefaults, presetsOf, refLabel, refOf, renamePreset, setEventSheets, switchPreset } from './presets';
 import { checkPointsTable, currentRevision, DEFAULT_POINTS, scoreEvent, snapshotOf } from './scoring';
 import { nowIso } from './time';
-import type { ChangeRecord, Course, Dataset, Driver, Entry, EventFormat, RaceEvent, Run, Season, Settings } from './types';
+import { SHEET_LABEL, type ChangeRecord, type Course, type Dataset, type Driver, type Entry, type EventFormat, type RaceEvent, type Run, type Season, type Settings, type SheetKind, type SheetSlot } from './types';
 
 export function seedDataset(seasonName = 'Baja75 Series ' + new Date().getFullYear()): Dataset {
   const ds = emptyDataset();
@@ -17,7 +18,7 @@ export function seedDataset(seasonName = 'Baja75 Series ' + new Date().getFullYe
   ds.rules.push(...templateRules());
   const s: Settings = { id: 'settings', selectedSeasonId: season.id, points: JSON.parse(JSON.stringify(DEFAULT_POINTS)), nonfinishPoints: 0, tiePolicy: 'competition', championshipTie: 'shared' };
   ds.settings.push(s);
-  return ds;
+  return ensurePresets(ds);
 }
 
 function clone(ds: Dataset): Dataset { return { ...ds }; }
@@ -39,8 +40,11 @@ export function createEvent(ds: Dataset, o: { seasonId: string; courseId: string
     id: uuid(), seasonId: o.seasonId, courseId: o.courseId, name: o.name.trim() || 'Race', round: o.round ?? null, date: o.date ?? '',
     format: o.format ?? 'selected', status: 'draft', included: true, practice: false, createdAt: nowIso(),
   };
-  const tpl = ds.rules.filter((r) => r.scope === 'template');
-  let out: Dataset = { ...ds, events: [...ds.events, event], rules: [...ds.rules, ...copyRulesForEvent(tpl, event.id)] };
+  // a new event uses the active Rule Sheet and Penalty Sheet (its penalty rules are its own copy)
+  const def = newEventDefaults(ds);
+  event.sheets = def.sheets;
+  if (!o.format) event.format = def.format;
+  let out: Dataset = { ...ds, events: [...ds.events, event], rules: [...ds.rules, ...copyRulesForEvent(def.rules, event.id)] };
   out = history(out, 'create', 'event', event.id, null, event);
   return { ds: out, event };
 }
@@ -80,7 +84,7 @@ export function finalizeEvent(ds: Dataset, eventId: string, justification = 'Fin
   const ev = ds.events.find((e) => e.id === eventId);
   if (!ev) return { ok: false, blockers: ['No such event'] };
   if (ev.status === 'finalized') return { ok: false, blockers: ['Already finalized: start an amendment to change it'] };
-  const pts = checkPointsTable(ds.settings[0]?.points ?? DEFAULT_POINTS);
+  const pts = checkPointsTable(eventRuleSheet(ds, ev).points ?? DEFAULT_POINTS);
   const score = scoreEvent(ds, eventId);
   const blockers = [...pts, ...score.blockers];
   if (!score.all.length) blockers.push('Nothing to finalize: no scored entries');
@@ -233,3 +237,34 @@ export function deleteDriver(ds: Dataset, driverId: string, reason: string): Dat
 }
 
 export { clone };
+
+// ------------------------------------------------------------------ presets (see presets.ts)
+
+/** Makes another preset the active Rule, Penalty or Class Sheet. Draft events using a Rule Sheet rescore; finalized results don't change. */
+export function choosePreset(ds: Dataset, kind: SheetKind, slot: SheetSlot, reason: string): Dataset {
+  const before = refOf(ds, kind, presetsOf(ds).active[kind]);
+  if (before.slot === slot) return ds;
+  const out = switchPreset(ds, kind, slot);
+  return history(out, 'preset-active', 'preset', kind, refLabel(before), refLabel(refOf(out, kind, slot)), reason || `${SHEET_LABEL[kind]}: preset ${slot}`);
+}
+
+export function renamePresetAction(ds: Dataset, kind: SheetKind, slot: SheetSlot, name: string): Dataset {
+  const before = refOf(ds, kind, slot).name;
+  const out = renamePreset(ds, kind, slot, name);
+  const after = refOf(out, kind, slot).name;
+  return before === after ? ds : history(out, 'preset-rename', 'preset', `${kind}-${slot}`, before, after, '');
+}
+
+export function copyIntoPreset(ds: Dataset, kind: SheetKind, slot: SheetSlot, reason: string): Dataset {
+  const from = refOf(ds, kind, presetsOf(ds).active[kind]);
+  return history(copyActiveInto(ds, kind, slot), 'preset-copy', 'preset', `${kind}-${slot}`, refLabel(from), refLabel(refOf(ds, kind, slot)), reason);
+}
+
+/** Picks the Rule Sheet and/or Penalty Sheet one draft event uses. A new Penalty Sheet replaces its penalty rules. */
+export function chooseEventSheets(ds: Dataset, eventId: string, pick: { rules?: SheetSlot; penalties?: SheetSlot }, reason: string): Dataset {
+  const ev = ds.events.find((e) => e.id === eventId);
+  if (!ev || ev.status === 'finalized') return ds;
+  const before = eventSlots(ev);
+  if ((pick.rules ?? before.rules) === before.rules && (pick.penalties ?? before.penalties) === before.penalties) return ds;
+  return history(setEventSheets(ds, eventId, pick), 'event-sheets', 'event', eventId, before, { ...before, ...pick }, reason);
+}

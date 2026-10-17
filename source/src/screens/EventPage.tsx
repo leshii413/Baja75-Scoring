@@ -1,13 +1,14 @@
 import { Fragment, useMemo, useState } from 'react';
-import { cancelAmendment, deleteEvent, deleteRun, editRun, finalizeEvent, history, markReviewed, revertToDraft, selectRun, setEntryStatus, startAmendment, updateEvent } from '../domain/actions';
+import { cancelAmendment, chooseEventSheets, deleteEvent, deleteRun, editRun, finalizeEvent, history, markReviewed, revertToDraft, selectRun, setEntryStatus, startAmendment, updateEvent } from '../domain/actions';
 import { classForRun, sortClasses } from '../domain/classes';
 import { penaltiesCsv, resultsCsv } from '../domain/exports';
 import { uuid } from '../domain/ids';
 import { checkCount, checkSeconds, label as metricLabel } from '../domain/penalties';
 import { currentRevision, entryKey, needsReview, scoreEvent, sortResults, timeMissing, type EntryResult } from '../domain/scoring';
 import { COL_METRIC, NO_DATA } from '../domain/csv';
+import { activeSlot, eventSheets, eventSlots, penaltiesChanged, refLabel, refOf } from '../domain/presets';
 import { formatMs, parseDuration } from '../domain/time';
-import { METRICS, type Dataset, type ResultLine, type Run } from '../domain/types';
+import { METRICS, SHEET_SLOTS, type Dataset, type ResultLine, type Run, type SheetSlot } from '../domain/types';
 import { useStore } from '../store/store';
 import { Dialog, download, EventStatusChip, Icon, safeFile, StatusChip, useOverride, useReason, useToast } from '../ui/common';
 import { className, courseLabel, driverLabel, sortedDrivers } from './shared';
@@ -53,6 +54,7 @@ export function EventPage({ eventId, go }: { eventId: string; go: (p: string) =>
           <h1>{ev.name} <EventStatusChip status={ev.status} />{ev.practice && <span className="chip" style={{ marginLeft: 6 }}>PRACTICE</span>}{!ev.included && <span className="chip" style={{ marginLeft: 6 }}>NOT COUNTED</span>}</h1>
           <p className="muted small">Course <b>{course?.originalName}</b>{course?.alias ? ` (shown as ${course.alias})` : ''} · Map {course?.map || 'unknown'} · Round {ev.round ?? '—'}{ev.date ? ' · ' + ev.date : ''} · {ev.format === 'best' ? 'Best adjusted attempt' : 'Selected attempt'}
             {rev && <> · Official revision {rev.revision} ({new Date(rev.createdAt).toLocaleString()})</>}</p>
+          <SheetLine ds={ds} ev={ev} />
         </div>
         <div className="row no-print">
           {ev.status === 'draft' && <button className="primary" onClick={doFinalize} disabled={score.blockers.length > 0}><Icon name="check" />Finalize</button>}
@@ -391,13 +393,37 @@ function Revisions({ ds, eventId }: { ds: Dataset; eventId: string }) {
   );
 }
 
+function SheetLine({ ds, ev }: { ds: Dataset; ev: NonNullable<Dataset['events'][number]> }) {
+  const s = eventSheets(ds, ev);
+  return (
+    <p className="small sheet-line">
+      <span><span className="muted">Rule Sheet</span> <b>{refLabel(s.rules)}</b></span>
+      <span><span className="muted">Penalty Sheet</span> <b>{refLabel(s.penalties)}</b>{s.penaltiesChanged && <span className="chip warn" style={{ marginLeft: 6 }}>CHANGED FOR THIS EVENT</span>}</span>
+      <span><span className="muted">Class Sheet</span> <b>{refLabel(s.classes)}</b></span>
+      {s.frozen && <span className="muted">(recorded when finalized)</span>}
+    </p>
+  );
+}
+
 function EventSettings({ ev, onClose }: { ev: NonNullable<Dataset['events'][number]>; onClose: () => void }) {
   const { ds, commit } = useStore();
-  const [f, setF] = useState({ name: ev.name, round: ev.round === null ? '' : String(ev.round), date: ev.date, format: ev.format, included: ev.included, practice: ev.practice, seasonId: ev.seasonId });
+  const slots = eventSlots(ev);
+  const [f, setF] = useState({ name: ev.name, round: ev.round === null ? '' : String(ev.round), date: ev.date, format: ev.format, included: ev.included, practice: ev.practice, seasonId: ev.seasonId, rules: slots.rules, penalties: slots.penalties });
   const roundBad = f.round.trim() !== '' && !/^\d{1,4}$/.test(f.round.trim());
+  const penaltyChange = f.penalties !== slots.penalties;
+  const save = () => commit((d) => {
+    const out = updateEvent(d, ev.id, { name: f.name.trim(), round: f.round.trim() ? Number(f.round) : null, date: f.date, format: f.format, included: f.included, practice: f.practice, seasonId: f.seasonId }, 'Event settings');
+    return chooseEventSheets(out, ev.id, { rules: f.rules, penalties: f.penalties }, 'Event settings');
+  }).then((ok) => ok && onClose());
   return (
-    <Dialog open title="Event settings" onClose={onClose} foot={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={roundBad || !f.name.trim()} onClick={() => commit((d) => updateEvent(d, ev.id, { name: f.name.trim(), round: f.round.trim() ? Number(f.round) : null, date: f.date, format: f.format, included: f.included, practice: f.practice, seasonId: f.seasonId }, 'Event settings')).then((ok) => ok && onClose())}>Save</button></>}>
+    <Dialog open title="Event settings" onClose={onClose} foot={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={roundBad || !f.name.trim()} onClick={save}>Save</button></>}>
       <div className="stack">
+        <div className="row">
+          <label className="field">Rule Sheet<select value={f.rules} onChange={(e) => setF({ ...f, rules: Number(e.target.value) as SheetSlot })}>{SHEET_SLOTS.map((n) => <option key={n} value={n}>{refLabel(refOf(ds, 'rules', n))}{n === activeSlot(ds, 'rules') ? ' (active)' : ''}</option>)}</select></label>
+          <label className="field">Penalty Sheet<select value={f.penalties} onChange={(e) => setF({ ...f, penalties: Number(e.target.value) as SheetSlot })}>{SHEET_SLOTS.map((n) => <option key={n} value={n}>{refLabel(refOf(ds, 'penalties', n))}{n === activeSlot(ds, 'penalties') ? ' (active)' : ''}</option>)}</select></label>
+        </div>
+        {penaltyChange && <div className="notice small">Saving copies {refLabel(refOf(ds, 'penalties', f.penalties))} into this event: it replaces this event's penalty rules{penaltiesChanged(ds, ev) ? ', including the changes made for this event' : ''}. Waivers and corrected counts stay.</div>}
+        <p className="small muted">The Class Sheet is the same for every event: change it in Presets.</p>
         <label className="field">Name<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
         <div className="row">
           <label className="field">Round<input inputMode="numeric" value={f.round} aria-invalid={roundBad} onChange={(e) => setF({ ...f, round: e.target.value })} /></label>

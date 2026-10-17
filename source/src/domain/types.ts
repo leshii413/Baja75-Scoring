@@ -33,6 +33,8 @@ export type EventStatus = 'draft' | 'finalized' | 'amending';
 export interface RaceEvent {
   id: string; seasonId: string; courseId: string; name: string; round: number | null; date: string;
   format: EventFormat; status: EventStatus; included: boolean; practice: boolean; createdAt: string;
+  /** which Rule Sheet and Penalty Sheet preset this event uses (missing = preset 1, for events made before presets) */
+  sheets?: { rules: SheetSlot; penalties: SheetSlot };
 }
 
 export interface Driver { id: string; name: string; number: string; team: string; aliases: string[]; createdAt: string }
@@ -101,7 +103,38 @@ export interface Settings {
   tiePolicy: 'competition'; championshipTie: 'shared';
   /** the logo shown in the app (an image data URL); null = the built-in B75 mark */
   logo?: string | null;
+  /** event format new events start with (part of the Rule Sheet) */
+  defaultFormat?: EventFormat;
+  /** the three presets of each sheet; missing = not set up yet (every slot starts as a copy of the current setup) */
+  presets?: Presets;
 }
+
+// ------------------------------------------------------------------ presets: 3 Rule, 3 Penalty and 3 Class Sheets
+export type SheetSlot = 1 | 2 | 3;
+export type SheetKind = 'rules' | 'penalties' | 'classes';
+export const SHEET_SLOTS: SheetSlot[] = [1, 2, 3];
+export const SHEET_LABEL: Record<SheetKind, string> = { rules: 'Rule Sheet', penalties: 'Penalty Sheet', classes: 'Class Sheet' };
+
+/** Scoring rules: race points, points for non-finishers and the format new events start with. */
+export interface RuleSheet { name: string; points: PointsTable; nonfinishPoints: number; defaultFormat: EventFormat }
+/** The penalty template: one rule per counter (plus any extra rules), seconds per occurrence. */
+export interface PenaltySheet { name: string; rules: PenaltyRule[] }
+/** Classes and the vehicle mappings that apply to every event. */
+export interface ClassSheet { name: string; classes: ClassDef[]; mappings: VehicleMapping[] }
+
+/**
+ * The active preset of each kind IS the live setup (Settings points, Penalties template, Classes & Vehicles): editing
+ * those pages edits the active preset. The stored copy of the active slot is only refreshed when another slot is chosen.
+ */
+export interface Presets {
+  active: Record<SheetKind, SheetSlot>;
+  rules: [RuleSheet, RuleSheet, RuleSheet];
+  penalties: [PenaltySheet, PenaltySheet, PenaltySheet];
+  classes: [ClassSheet, ClassSheet, ClassSheet];
+}
+
+export interface SheetRef { slot: SheetSlot; name: string }
+
 
 export interface ResultLine {
   entryId: string; driverId: string; classId: string; runId: string | null; status: EntryStatus;
@@ -113,7 +146,9 @@ export interface BreakdownLine { kind: 'auto' | 'manual'; name: string; reason: 
 
 export interface ResultRevision {
   id: string; eventId: string; revision: number; createdAt: string; justification: string; superseded: boolean;
-  snapshot: { points: PointsTable; nonfinishPoints: number; tiePolicy: string; format: EventFormat; rules: PenaltyRule[]; results: ResultLine[] };
+  snapshot: { points: PointsTable; nonfinishPoints: number; tiePolicy: string; format: EventFormat; rules: PenaltyRule[]; results: ResultLine[];
+    /** the sheets the results were scored with (revisions made before v1.0.3 don't have this) */
+    sheets?: Record<SheetKind, SheetRef> & { penaltiesChanged?: boolean } };
 }
 
 export interface ChangeRecord { id: string; at: string; type: string; entity: string; entityId: string; before: unknown; after: unknown; reason: string }

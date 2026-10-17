@@ -4,6 +4,7 @@ import { classForRun, mappingConflicts, sortClasses } from '../domain/classes';
 import { uuid } from '../domain/ids';
 import type { MatchType, VehicleMapping } from '../domain/types';
 import { useStore } from '../store/store';
+import { activeSlot, refLabel, refOf } from '../domain/presets';
 import { useToast } from '../ui/common';
 import { className } from './shared';
 
@@ -31,7 +32,8 @@ export function Classes() {
   };
   return (
     <>
-      <div className="page-head"><div><h1>Classes &amp; Vehicles</h1><p className="muted">A run is in a class only when its vehicle is mapped here (or set by hand on the race page). Nothing is guessed from a vehicle's name or type.</p></div></div>
+      <div className="page-head"><div><h1>Classes &amp; Vehicles</h1><p className="muted">A run is in a class only when its vehicle is mapped here (or set by hand on the race page). Nothing is guessed from a vehicle's name or type.</p>
+        <p className="small">Editing the active <b>Class Sheet: {refLabel(refOf(ds, 'classes', activeSlot(ds, 'classes')))}</b> (<a href="#/presets">Presets</a>). Mappings for one event only stay with that event.</p></div></div>
       {conflicts.length > 0 && <div className="notice bad"><b>Conflicting mappings</b>: runs matching these stay unassigned until one is removed.<ul>{conflicts.map((c) => <li key={c.key}>{c.mappings[0].matchType === 'model' ? 'Model' : 'Configuration'} “{c.mappings[0].matchValue}” ({scopeName(c.mappings[0].scope)}) → {c.mappings.map((m) => className(ds, m.classId)).join(' / ')}</li>)}</ul></div>}
       {unassigned.length > 0 && (
         <section className="panel" style={{ borderColor: '#6a5220' }}>

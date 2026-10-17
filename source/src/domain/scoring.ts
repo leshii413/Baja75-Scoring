@@ -3,6 +3,7 @@
 
 import { classForRun, sortClasses } from './classes';
 import { computePenalties } from './penalties';
+import { eventRuleSheet, eventSheets } from './presets';
 import type {
   BreakdownLine, Dataset, Entry, EntryStatus, PenaltyRule, PointsTable, RaceEvent, ResultLine, ResultRevision, Run,
 } from './types';
@@ -67,9 +68,9 @@ function runOrder(a: Run, b: Run): number {
 export function scoreEvent(ds: Dataset, eventId: string, opts: { rules?: PenaltyRule[]; points?: PointsTable } = {}): EventScore {
   const event = ds.events.find((e) => e.id === eventId);
   if (!event) throw new Error('No such event');
-  const settings = ds.settings[0];
-  const points = opts.points ?? settings?.points ?? DEFAULT_POINTS;
-  const nonfinish = settings?.nonfinishPoints ?? 0;
+  const sheet = eventRuleSheet(ds, event);
+  const points = opts.points ?? sheet.points ?? DEFAULT_POINTS;
+  const nonfinish = sheet.nonfinishPoints ?? 0;
   const rules = opts.rules ?? eventRules(ds, eventId);
   const classes = new Map(ds.classes.map((c) => [c.id, c]));
   const runs = ds.runs.filter((r) => r.eventId === eventId).sort(runOrder);
@@ -164,8 +165,11 @@ export function driverName(ds: Dataset, id: string | null): string {
 /** What gets frozen when an event is finalized or amended. */
 export function snapshotOf(ds: Dataset, score: EventScore): ResultRevision['snapshot'] {
   const s = ds.settings[0];
+  const sheet = eventRuleSheet(ds, score.event);
+  const used = eventSheets(ds, { ...score.event, status: 'draft' });
   return {
-    points: JSON.parse(JSON.stringify(s?.points ?? DEFAULT_POINTS)), nonfinishPoints: s?.nonfinishPoints ?? 0, tiePolicy: s?.tiePolicy ?? 'competition',
+    sheets: { rules: used.rules!, penalties: used.penalties!, classes: used.classes!, penaltiesChanged: used.penaltiesChanged },
+    points: JSON.parse(JSON.stringify(sheet.points ?? DEFAULT_POINTS)), nonfinishPoints: sheet.nonfinishPoints ?? 0, tiePolicy: s?.tiePolicy ?? 'competition',
     format: score.event.format, rules: JSON.parse(JSON.stringify(eventRules(ds, score.event.id))),
     results: score.all.map((r) => ({
       entryId: r.entryId, driverId: r.driverId, classId: r.classId, runId: r.runId, status: r.status, rawMs: r.rawMs, penaltyMs: r.penaltyMs,

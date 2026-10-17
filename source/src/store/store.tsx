@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Dataset } from '../domain/types';
 import { loadAll, replaceAll, saveDiff } from './db';
+import { ensurePresets } from '../domain/presets';
 
 export type SaveState = { kind: 'loading' } | { kind: 'saved'; at: number } | { kind: 'saving' } | { kind: 'error'; message: string };
 
@@ -51,7 +52,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return p;
   }, []);
 
-  const replace = useCallback(async (next: Dataset) => {
+  const replace = useCallback(async (incoming: Dataset) => {
+    const next = incoming.settings.length ? ensurePresets(incoming) : incoming; // backups from before v1.0.3 have no presets
     setSave({ kind: 'saving' });
     try { await replaceAll(next); cur.current = next; setDs(next); setSave({ kind: 'saved', at: Date.now() }); return true; }
     catch (e) { setSave({ kind: 'error', message: 'Not saved: ' + String((e as Error)?.message ?? e) }); return false; }

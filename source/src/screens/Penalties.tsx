@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { history } from '../domain/actions';
 import { uuid } from '../domain/ids';
 import { copyRulesForEvent } from '../domain/penalties';
+import { activeSlot, eventSheets, refLabel, refOf } from '../domain/presets';
 import { scoreEvent, sortResults } from '../domain/scoring';
 import { formatMs } from '../domain/time';
 import { METRICS, type Dataset, type Metric, type PenaltyRule } from '../domain/types';
@@ -36,7 +37,8 @@ export function Penalties({ seasonId }: { seasonId: string }) {
           {ev && !locked && <button onClick={() => askReason('Copy the template into this event', 'This replaces this event’s rules with the default template. Why?', (why) => commit((d) => history({ ...d, rules: [...d.rules.filter((r) => r.scope !== ev.id), ...copyRulesForEvent(d.rules.filter((r) => r.scope === 'template'), ev.id)] }, 'rules-reset', 'event', ev.id, null, 'template', why)))}>Reset from template</button>}
         </div>
         {locked && <div className="notice small">This event is finalized: its rules are frozen with its results. Start an amendment on the race page to change them.</div>}
-        {scope === 'template' && <p className="small muted">Changing the template affects events created afterwards. Existing events keep their own rules (use Reset from template on one to copy these in).</p>}
+        {scope === 'template' && <p className="small muted">The default template is the active <b>Penalty Sheet: {refLabel(refOf(ds, 'penalties', activeSlot(ds, 'penalties')))}</b> (<a href="#/presets">Presets</a>). Changing it affects events created afterwards. Existing events keep their own rules (use Reset from template on one to copy these in, or pick a Penalty Sheet in the race's Event settings).</p>}
+        {ev && <p className="small muted">This event uses <b>Penalty Sheet: {refLabel(eventSheets(ds, ev).penalties)}</b>{eventSheets(ds, ev).penaltiesChanged ? ', with changes made for this event' : ''}.</p>}
         <div className="table-wrap"><table className="cards">
           <thead><tr><th>On</th><th>Penalty</th><th>Reason / justification</th><th>Counter</th><th>Seconds each</th><th></th></tr></thead>
           <tbody>{rules.map((r) => {
