@@ -12,7 +12,7 @@ import { activeSlot, refLabel, refOf } from '../domain/presets';
 import { Dialog, download, Icon, readFileText, useOverride, useToast } from '../ui/common';
 import { LogoSetting } from '../ui/Logo';
 
-export const APP_VERSION = '1.0.3';
+export const APP_VERSION = '1.1.0';
 export const PATREON_URL = 'https://www.patreon.com/c/Baja75Series';
 export const LICENSE_URL = 'https://creativecommons.org/licenses/by-nc-sa/4.0/';
 

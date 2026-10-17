@@ -94,6 +94,22 @@ posts into the manual CSV template.
   active sheets are flagged **NOT ACTIVE**.
 - Data from an older version starts with Preset 1, 2 and 3 all copies of your current setup, Preset 1 active.
 
+## Live (live timing)
+
+**Live** shows a race while it runs: every car's position every 3 seconds on a map of the route, race time, progress
+(lap, race mile, VCPs), off course, wrong way, speeding, missed VCPs, jump starts, resets, recoveries and damage.
+
+1. Set up once: the relay on Cloudflare, the `Baja75Live` server plugin and the Live Bridge client mod on the server
+   (see `live/README.md`).
+2. **Live** › paste your website's embed code (or the live link) › **Connect**.
+3. Races that are on are listed (a race starts by itself when a driver starts a run on a server course) › **Watch live**.
+4. Pick the **Penalty Sheet** to estimate penalties with: the table adds *Est. penalty* and *Est. adjusted* time.
+   The map draws the route (from the server's route file, or from the paths driven) and each car's last known position;
+   a car not heard from for 15 seconds is faded and marked *last known*.
+
+The same page, without the scoring tools, is what the website embed shows (**Embed on your website** has the code).
+Live numbers are estimates: official results still come from the run logs or Discord results through Import Data.
+
 ## Classes & Vehicles
 
 - The 14 classes: Class 1, 2, 3, 4, 5, 5U, 6, 7, 8, 9, 10, 11, 15, 18. Class 5 and 5U are separate.

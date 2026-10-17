@@ -11,11 +11,12 @@ import { Drivers } from './screens/Drivers';
 import { Overall } from './screens/Overall';
 import { SettingsPage } from './screens/SettingsPage';
 import { Presets } from './screens/Presets';
+import { Live } from './screens/Live';
 import { UpdatePrompt } from './ui/UpdatePrompt';
 import { BrandMark } from './ui/Logo';
 
 const NAV: [string, string, string][] = [
-  ['dashboard', 'Dashboard', 'dash'], ['races', 'Races', 'flag'], ['import', 'Import Data', 'upload'], ['penalties', 'Penalties', 'timer'],
+  ['dashboard', 'Dashboard', 'dash'], ['races', 'Races', 'flag'], ['live', 'Live', 'live'], ['import', 'Import Data', 'upload'], ['penalties', 'Penalties', 'timer'],
   ['classes', 'Classes & Vehicles', 'car'], ['drivers', 'Drivers', 'user'], ['overall', 'Overall Score', 'trophy'], ['presets', 'Presets', 'layers'], ['settings', 'Settings / Backup', 'gear'],
 ];
 
@@ -37,6 +38,7 @@ export function App() {
   else if (tab === 'overall') page = <Overall seasonId={seasonId} go={go} />;
   else if (tab === 'settings') page = <SettingsPage />;
   else if (tab === 'presets') page = <Presets />;
+  else if (tab === 'live') page = <Live raceId={route[1]} go={go} />;
   else page = <Dashboard go={go} seasonId={seasonId} />;
 
   return (

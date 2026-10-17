@@ -1,0 +1,19 @@
+{
+  "name": "baja75-live-relay",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Baja75 live timing relay: receives live race data from the BeamMP server and serves a live results embed",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run"
+  },
+  "license": "CC-BY-NC-SA-4.0",
+  "author": "Leshii413 | Baja75 Series",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261016.1",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.151.1"
+  }
+}

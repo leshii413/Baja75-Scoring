@@ -19,6 +19,7 @@ const P: Record<string, string> = {
   check: 'M5 12l5 5 9-10',
   x: 'M6 6l12 12M18 6L6 18',
   lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
+  live: 'M10 12a2 2 0 104 0 2 2 0 00-4 0M7.5 7.5a6.4 6.4 0 000 9M16.5 7.5a6.4 6.4 0 010 9M4.6 4.6a10.5 10.5 0 000 14.8M19.4 4.6a10.5 10.5 0 010 14.8',
   layers: 'M12 3l9 5-9 5-9-5 9-5zm-9 9l9 5 9-5M3 16l9 5 9-5',
 };
 export function Icon({ name }: { name: keyof typeof P | string }) {

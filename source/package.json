@@ -1,7 +1,7 @@
 {
   "name": "baja75-scoring",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.1.0",
   "type": "module",
   "description": "Baja75 Scoring Management System",
   "engines": {

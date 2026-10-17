@@ -103,6 +103,8 @@ export interface Settings {
   tiePolicy: 'competition'; championshipTie: 'shared';
   /** the logo shown in the app (an image data URL); null = the built-in B75 mark */
   logo?: string | null;
+  /** address of the Baja75 live relay (Live page) */
+  liveUrl?: string;
   /** event format new events start with (part of the Rule Sheet) */
   defaultFormat?: EventFormat;
   /** the three presets of each sheet; missing = not set up yet (every slot starts as a copy of the current setup) */

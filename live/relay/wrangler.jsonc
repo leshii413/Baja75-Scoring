@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "baja75-live",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "LiveHub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveHub"] }],
+  "observability": { "enabled": true }
+}
