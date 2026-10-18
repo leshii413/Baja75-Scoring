@@ -51,6 +51,21 @@ const fmt = (ms) => { if (ms == null) return '—'; ms = Math.max(0, Math.round(
   return (h ? h + ':' + String(m).padStart(2,'0') : m) + ':' + String(s).padStart(2,'0') + '.' + t; };
 const PEN = [['offCourse','Off course','OC'],['speeding','Speeding','SP'],['missedVcps','Missed VCPs','VCP'],['wrongWay','Wrong way','WW'],['jumpStarts','Jump start','JS'],['recoveries','Recoveries','REC'],['damageHits','Damage','DMG']];
 let race = null, trails = {}, recvAt = 0, ws = null, raceId = FIXED, pollT = null, lastMsg = 0, bounds = null;
+// smooth movement: each car glides from where it is drawn to its new position over the time between updates
+const anim = {}; let gap = 1000;
+const ease = (t) => t < 0 ? 0 : t > 1 ? 1 : t;
+function animPos(a, now){ const t = ease((now - a.t0) / a.dur); return [a.fx + (a.tx - a.fx) * t, a.fy + (a.ty - a.fy) * t]; }
+function retarget(first){
+  const now = performance.now();
+  for (const d of race.drivers) {
+    if (!d.pos) continue;
+    const tx = d.pos[0], ty = -d.pos[1], a = anim[d.key];
+    const cur = a && !first ? animPos(a, now) : [tx, ty];
+    // a jump of more than 2 km (a reset or teleport) is not animated
+    const far = Math.hypot(tx - cur[0], ty - cur[1]) > 2000;
+    anim[d.key] = { fx: far ? tx : cur[0], fy: far ? ty : cur[1], tx, ty, t0: now, dur: gap };
+  }
+}
 
 function api(p){ return fetch(p, {cache:'no-store'}).then((r) => r.ok ? r.json() : Promise.reject(r.status)); }
 
@@ -86,15 +101,18 @@ function startPoll(){
   if (pollT) return;
   const tick = async () => { if (ws && ws.readyState === 1 && Date.now() - lastMsg < 20000) { pollT = null; return; }
     try { const r = await api('/api/races/' + raceId + (race ? '' : '?trails=1')); onMsg(race ? {type:'update', race:r, add:{}} : {type:'snapshot', race:r}); } catch(e){}
-    pollT = setTimeout(tick, 3000); };
+    pollT = setTimeout(tick, 1000); };
   pollT = setTimeout(tick, 100);
 }
 function onMsg(m){
+  const since = Date.now() - lastMsg;
+  if (lastMsg && since > 150 && since < 5000) gap = Math.min(3500, Math.max(250, gap * 0.7 + since * 0.3));
   lastMsg = Date.now();
   if (m.type === 'missing') { raceId = FIXED ? raceId : null; return boot(); }
   if (m.type === 'snapshot') { race = m.race; trails = m.race.trails || {}; bounds = null; }
   if (m.type === 'update') { race = m.race; for (const k in (m.add || {})) (trails[k] = trails[k] || []).push(...m.add[k]); }
   recvAt = Date.now();
+  if (race) retarget(m.type === 'snapshot');
   render();
   if (!FIXED && race && race.status === 'ended') setTimeout(follow, 30000);
 }
@@ -146,14 +164,19 @@ function mapCard(){
   const ds = [...race.drivers].filter((d) => d.pos).reverse();
   for (const d of ds) {
     const stale = (race.now - d.lastSeen) > 15000, c = color(d.key);
-    const x = d.pos[0], y = -d.pos[1];
-    s += '<g opacity="' + (stale ? .45 : 1) + '"><circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (u * 4.5) + '" fill="' + c + '" stroke="#0b0b0c" stroke-width="' + (u * 1.2) + '"/>'
-      + '<text x="' + (x + u * 6).toFixed(1) + '" y="' + (y + u * 3).toFixed(1) + '" font-size="' + (u * 9) + '" fill="#f2f0ed" stroke="#0b0b0c" stroke-width="' + (u * 2.4) + '" paint-order="stroke" font-weight="700">' + esc((d.rank ? 'P' + d.rank + ' ' : '') + (d.number ? '#' + d.number : d.name)) + (stale ? ' (last known)' : '') + '</text></g>';
+    const a = anim[d.key], at = a ? animPos(a, performance.now()) : [d.pos[0], -d.pos[1]];
+    s += '<g class="dot" data-k="' + esc(d.key) + '" transform="translate(' + at[0].toFixed(1) + ',' + at[1].toFixed(1) + ')" opacity="' + (stale ? .45 : 1) + '"><circle cx="0" cy="0" r="' + (u * 4.5) + '" fill="' + c + '" stroke="#0b0b0c" stroke-width="' + (u * 1.2) + '"/>'
+      + '<text x="' + (u * 6).toFixed(1) + '" y="' + (u * 3).toFixed(1) + '" font-size="' + (u * 9) + '" fill="#f2f0ed" stroke="#0b0b0c" stroke-width="' + (u * 2.4) + '" paint-order="stroke" font-weight="700">' + esc((d.rank ? 'P' + d.rank + ' ' : '') + (d.number ? '#' + d.number : d.name)) + (stale ? ' (last known)' : '') + '</text></g>';
   }
   s += '</svg>';
   const n = race.drivers.filter((d) => d.pos).length;
   return '<div class="card"><div class="maphead"><span>Live view · last known positions</span><span>' + n + ' car' + (n === 1 ? '' : 's') + (race.route ? '' : ' · route drawn from driven paths') + '</span></div>' + s + '</div>';
 }
+(function frame(){
+  const now = performance.now();
+  document.querySelectorAll('g.dot').forEach((g) => { const a = anim[g.getAttribute('data-k')]; if (a) { const p = animPos(a, now); g.setAttribute('transform', 'translate(' + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ')'); } });
+  requestAnimationFrame(frame);
+})();
 setInterval(() => {
   if (!race) return;
   const age = Math.round((Date.now() - recvAt) / 1000);

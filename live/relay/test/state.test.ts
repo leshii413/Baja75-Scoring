@@ -98,4 +98,27 @@ describe('live relay state', () => {
     expect(x.speed).toBeUndefined();
     expect(x.nav).toMatchObject({ state: undefined, elapsedMs: undefined, counters: { speeding: 3 } });
   });
+
+  it('track samples between pushes (0.5 s sample mode) all land on the trail, in order, before the newest position', () => {
+    const hub = emptyHub();
+    ingest(hub, push([{ name: 'A', pos: [0, 0, 0], nav: nav() }]), T0);
+    ingest(hub, push([{ name: 'A', track: [[20, 0], [40, 0]], pos: [60, 0, 0], nav: nav() } as never]), T0 + 1000);
+    const id = listRaces(hub)[0].id;
+    expect(Object.values(hub.trails[id])[0]).toEqual([[0, 0], [20, 0], [40, 0], [60, 0]]);
+    expect(hub.races[id].drivers[0].pos).toEqual([60, 0]);
+  });
+
+  it('a hostile track is trimmed and cleaned', () => {
+    const p = cleanPayload({ players: [{ name: 'A', track: [...Array(50)].map((_, i) => [i * 20, 0]).concat([['x', 1] as never]) }] })!;
+    expect(p.players[0].track).toHaveLength(LIMITS.maxTrackPoints);
+  });
+
+  it('a long trail drops its oldest chunk, never growing past the cap', () => {
+    const hub = emptyHub();
+    for (let i = 0; i <= LIMITS.maxTrailPoints + 5; i++) ingest(hub, push([{ name: 'A', pos: [i * 20, 0, 0], nav: nav() }]), T0 + i * 10);
+    const trail = Object.values(Object.values(hub.trails)[0])[0];
+    expect(trail.length).toBeLessThanOrEqual(LIMITS.maxTrailPoints);
+    expect(trail.length).toBeGreaterThan(LIMITS.maxTrailPoints - LIMITS.trailChunk);
+    expect(trail.at(-1)![0]).toBe((LIMITS.maxTrailPoints + 5) * 20);
+  });
 });

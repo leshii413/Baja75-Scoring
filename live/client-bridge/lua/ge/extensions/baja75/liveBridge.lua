@@ -1,8 +1,8 @@
 --[[
 Baja75 Live Bridge (BeamNG GE Lua, LuaJIT). Extension: baja75_liveBridge
 
-Sends this player's live race state to the Baja75Live server plugin every 3 seconds (and right away when a run
-starts or ends). The server adds the car's position and resets and forwards everything to the live results page.
+Sends this player's live race state to the Baja75Live server plugin every second (and within half a second when a
+run starts or ends). The server adds the car's position and resets and forwards everything to the live results page.
 
 Where the state comes from:
   1. The Baja75 Navigation Unit, which calls (any time, as often as it likes):
@@ -16,7 +16,8 @@ Where the state comes from:
 local M = {}
 local TAG = "baja75Live"
 local EVENT = "baja75live_nav"
-local INTERVAL = 3.0
+local INTERVAL = 1.0
+local CHANGE_GAP = 0.5   -- a start / finish / DNF goes out this soon after the previous send
 local STALE = 10.0
 
 local latest, latestAt, lastSentState = nil, -1e9, nil
@@ -69,19 +70,19 @@ end
 function M.report(state)
   if type(state) ~= "table" or type(state.course) ~= "string" or state.course == "" then return end
   latest, latestAt = state, clock
-  -- a run starting or ending goes out straight away (at most once a second)
-  if isMP() and state.state ~= lastSentState and sinceSend >= 1.0 then send(state) end
+  -- a run starting or ending goes out straight away (at most twice a second)
+  if isMP() and state.state ~= lastSentState and sinceSend >= CHANGE_GAP then send(state) end
 end
 
 function M.onUpdate(dtReal)
   clock = clock + (dtReal or 0)
   sinceSend = sinceSend + (dtReal or 0)
   if not isMP() then return end
-  -- a start / finish / DNF that came in just after a send goes out within a second
-  if latest and latest.state ~= lastSentState and sinceSend >= 1.0 and clock - latestAt <= STALE then send(latest) return end
+  -- a start / finish / DNF that came in just after a send goes out within half a second
+  if latest and latest.state ~= lastSentState and sinceSend >= CHANGE_GAP and clock - latestAt <= STALE then send(latest) return end
   if sinceSend < INTERVAL then return end
   local state = (latest and clock - latestAt <= STALE) and latest or fromBeamJoy()
-  if state then send(state) else sinceSend = INTERVAL - 0.5 end  -- check again shortly
+  if state then send(state) else sinceSend = INTERVAL - 0.25 end  -- check again shortly
 end
 
 function M.onBeamMPServerLeave() latest, lastSentState = nil, nil end

@@ -1,6 +1,6 @@
 // Baja75 live timing relay (Cloudflare Worker + one Durable Object).
 //
-//   POST /api/push                 the BeamMP server plugin, every ~3 s (Authorization: Bearer <PUSH_KEY>)
+//   POST /api/push                 the BeamMP server plugin, every second by default (Authorization: Bearer <PUSH_KEY>)
 //   GET  /api/races                live and recent races
 //   GET  /api/races/<id>[?trails=1] one race (trails = every car's path, which draws the route)
 //   GET  /api/races/<id>/ws         WebSocket: a snapshot, then every update as it arrives
@@ -12,7 +12,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { embedHtml } from './embed';
-import { cleanPayload, emptyHub, housekeeping, ingest, listRaces, raceView, type Hub } from './state';
+import { cleanPayload, emptyHub, housekeeping, ingest, LIMITS, listRaces, raceView, type Hub } from './state';
 
 export interface Env { HUB: DurableObjectNamespace<LiveHub>; PUSH_KEY?: string }
 
@@ -66,31 +66,67 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-const PERSIST_EVERY_MS = 15_000;
+const PERSIST_EVERY_MS = 30_000;
 
 export class LiveHub extends DurableObject<Env> {
   private hub: Hub | null = null;
   private lastPersist = 0;
   private dirty = new Set<string>();
+  /** trail points already stored, per "race|driver" */
+  private persisted: Record<string, number> = {};
 
   private async load(): Promise<Hub> {
     if (this.hub) return this.hub;
     const meta = await this.ctx.storage.get<Omit<Hub, 'trails'>>('hub');
     const hub: Hub = meta ? { ...meta, trails: {} } : emptyHub();
-    for (const id of Object.keys(hub.races)) hub.trails[id] = (await this.ctx.storage.get<Hub['trails'][string]>('trails:' + id)) ?? {};
+    // trails: "t|<race>|<chunk>|<driver>" = 1,000 points each, so no stored item gets near the size limit
+    const stored = await this.ctx.storage.list<[number, number][]>({ prefix: 't|' });
+    const chunks: Record<string, [number, [number, number][]][]> = {};
+    for (const [k, pts] of stored) {
+      const m = /^t\|([^|]+)\|(\d+)\|(.+)$/.exec(k);
+      if (!m || !hub.races[m[1]]) continue;
+      (chunks[`${m[1]}|${m[3]}`] ??= []).push([Number(m[2]), pts]);
+    }
+    for (const [rk, list] of Object.entries(chunks)) {
+      const i = rk.indexOf('|'), raceId = rk.slice(0, i), driverKey = rk.slice(i + 1);
+      const pts = list.sort((x, y) => x[0] - y[0]).flatMap((x) => x[1]);
+      (hub.trails[raceId] ??= {})[driverKey] = pts;
+      this.persisted[rk] = pts.length;
+    }
     this.hub = hub;
     return hub;
   }
 
+  /** Writes what changed: the race list, and per driver only the trail chunks that grew (rows written are counted daily). */
   private async persist(force = false) {
     const hub = this.hub; if (!hub) return;
     const now = Date.now();
     if (!force && now - this.lastPersist < PERSIST_EVERY_MS) return;
     this.lastPersist = now;
     await this.ctx.storage.put('hub', { races: hub.races, resetBase: hub.resetBase });
+    const C = LIMITS.trailChunk;
     for (const id of this.dirty) {
-      if (hub.trails[id]) await this.ctx.storage.put('trails:' + id, hub.trails[id]);
-      else await this.ctx.storage.delete('trails:' + id);
+      if (!hub.races[id]) {
+        const gone = await this.ctx.storage.list({ prefix: `t|${id}|` });
+        if (gone.size) await this.ctx.storage.delete([...gone.keys()]);
+        for (const k of Object.keys(this.persisted)) if (k.startsWith(id + '|')) delete this.persisted[k];
+        continue;
+      }
+      const items: Record<string, [number, number][]> = {};
+      const drop: string[] = [];
+      for (const [driverKey, pts] of Object.entries(hub.trails[id] ?? {})) {
+        const rk = `${id}|${driverKey}`, before = this.persisted[rk] ?? 0;
+        if (pts.length === before) continue;
+        const trimmed = pts.length < before;     // the oldest chunk was dropped: chunk numbers shifted, rewrite all
+        const from = trimmed ? 0 : Math.floor(before / C);
+        const n = Math.ceil(pts.length / C);
+        for (let c = from; c < n; c++) items[`t|${id}|${c}|${driverKey}`] = pts.slice(c * C, (c + 1) * C);
+        if (trimmed) for (let c = n; c < Math.ceil(before / C); c++) drop.push(`t|${id}|${c}|${driverKey}`);
+        this.persisted[rk] = pts.length;
+      }
+      const keys = Object.keys(items);
+      for (let i = 0; i < keys.length; i += 100) await this.ctx.storage.put(Object.fromEntries(keys.slice(i, i + 100).map((k) => [k, items[k]])));
+      if (drop.length) await this.ctx.storage.delete(drop);
     }
     this.dirty.clear();
   }

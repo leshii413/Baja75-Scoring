@@ -1,12 +1,12 @@
 # Baja75 Live: live race timing for your website and the scoring app
 
-While a race runs, your BeamMP server sends every car's position, time, resets and penalty counts every 3 seconds.
+While a race runs, your BeamMP server sends every car's position, time, resets and penalty counts every second.
 Your website shows a live leaderboard and a map of the route with each car's last known position, and the scoring
 app shows the same with penalty estimates from your Penalty Sheet.
 
 ```
  Players' game                       PedalHost (BeamMP server)                Cloudflare (free)                 Viewers
- ┌───────────────────────┐ every 3 s ┌──────────────────────────┐ every 3 s ┌─────────────────────────┐  live  ┌──────────────────────┐
+ ┌───────────────────────┐ every 1 s ┌──────────────────────────┐ every 1 s ┌─────────────────────────┐  live  ┌──────────────────────┐
  │ Navigation Unit        │ ────────▶ │ Baja75Live plugin         │ ────────▶ │ baja75-live relay        │ ─────▶ │ website <iframe>     │
  │  + Baja75 Live Bridge  │  counters │  + positions, speed,      │   HTTPS   │  races, trails (route),  │        │ scoring app › Live   │
  │    (client mod)        │  & time   │    resets (server-side)   │   + key   │  WebSocket to viewers    │        └──────────────────────┘
@@ -25,7 +25,7 @@ app shows the same with penalty estimates from your Penalty Sheet.
 ## 1. Put the relay on Cloudflare (once, about 10 minutes)
 
 The relay receives the server's data and serves the live page. It runs on Cloudflare's free plan: 100,000 requests a
-day. A race sends one request every 3 seconds (1,200 an hour), and viewers watching live cost nothing extra.
+day. A race sends one request every second (1,200 an hour), and viewers watching live cost nothing extra.
 
 **A. From the Cloudflare dashboard (no command line)**
 1. Make a free account at https://dash.cloudflare.com/sign-up.
@@ -53,7 +53,7 @@ Optional: a custom address like `live.baja75series.com` (Worker › Settings ›
 2. Upload `baja75_live_bridge.zip` to `Resources/Client/` (players download it automatically when they join).
 3. Restart the server. The plugin creates `Resources/Server/Baja75Live/data/config.json`. Edit it:
    ```json
-   { "url": "https://baja75-live.<your-name>.workers.dev", "key": "<the same PUSH_KEY>", "serverName": "Baja75 Casual Server", "intervalMs": 3000, "enabled": true }
+   { "url": "https://baja75-live.<your-name>.workers.dev", "key": "<the same PUSH_KEY>", "serverName": "Baja75 Casual Server", "intervalMs": 1000, "enabled": true }
    ```
    `serverName` is optional: blank uses the server's own name.
 4. Restart again. In the server console type **`b75live`**: it shows the relay, whether `curl` is available, how many
@@ -73,7 +73,7 @@ e.g. `october3.json`:
 ## 3. Hook the Navigation Unit in (one line)
 
 The Live Bridge carries the Navigation Unit's live state to the server. Wherever the Navigation Unit updates its run
-state (once a frame or once a second, both fine; the bridge sends every 3 s and at once on start or finish), add:
+state (once a frame or once a second, both fine; the bridge sends every 1 s and at once on start or finish), add:
 
 ```lua
 if extensions.baja75_liveBridge then
@@ -104,7 +104,7 @@ counts and race time.
   ```
   `/embed/<race id>` shows one race; add `?view=board` or `?view=map` for one half, `?title=0` to hide the header.
 - **Scoring app › Live**: paste the same embed code (or the link) → **Connect** → pick a race that's on → **Watch live**.
-  The leaderboard updates every 3 seconds, with off course, wrong way, speeding, missed VCPs, jump starts, resets,
+  The leaderboard updates every second, with off course, wrong way, speeding, missed VCPs, jump starts, resets,
   recoveries and damage, plus an estimated penalty and adjusted time from the Penalty Sheet you choose. The live view
   draws the route and each car's last known position (faded after 15 seconds without an update).
 
@@ -120,3 +120,8 @@ imported and finalized as usual.
   PedalHost allows `curl` (the `b75live` console command tells you).
 
 Data kept: races and paths for 48 hours after a race ends. Driver names, positions and counts only. No IP addresses.
+
+## Update rate (v1.1.1)
+
+Default is 1 second (`intervalMs: 1000`, minimum 500). Optional `sampleMs` (250 up to below `intervalMs`, e.g. `500`) reads positions
+more often than it sends, so trails get extra points at the same request cost. The embed moves dots smoothly between updates.

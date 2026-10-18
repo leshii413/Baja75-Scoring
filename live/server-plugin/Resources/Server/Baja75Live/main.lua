@@ -1,13 +1,16 @@
 --[[
 Baja75Live — BeamMP server plugin (Lua 5.3, BeamMP-Server 3.x)
 
-Every 3 seconds, while a race is on, sends every player's live data to the Baja75 live relay (a Cloudflare Worker):
+Every second (configurable), while a race is on, sends every player's live data to the Baja75 live relay (a Cloudflare Worker):
   * position, speed and heading of the car (read by the server: MP.GetPositionRaw)
   * resets (counted by the server: onVehicleReset)
   * what the Baja75 Navigation Unit reports through the live bridge client mod (event "baja75live_nav"):
     course, run state, elapsed time, race mile, laps, VCPs, off course / speeding / damage … counters
 
 Setup: edit data/config.json (created on first start):  url = your relay address, key = the PUSH_KEY you set on it.
+  intervalMs (default 1000, 500 to 60000) = how often data is sent
+  sampleMs   (optional, 250 to intervalMs) = how often positions are read; e.g. 500 with intervalMs 1000 sends two
+             positions per car in each send, for a smoother map at the same number of requests
 Optional route lines: data/routes/<anything>.json  →  { "course": "BAJA75 Series: October 3rd Race", "points": [[x, y], …] }
 Console: "b75live" shows the status.
 
@@ -18,9 +21,10 @@ Discord), so the server never waits for the network.
 local PLUGIN = "Baja75Live"
 local ROOT = "Resources/Server/" .. PLUGIN
 local DATA = ROOT .. "/data"           -- written files live here, never in the plugin root (that would hot-reload it)
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 
-local cfg = { url = "", key = "", serverName = "", intervalMs = 3000, enabled = true }
+local cfg = { url = "", key = "", serverName = "", intervalMs = 1000, sampleMs = 0, enabled = true }
+local FILES = 8         -- rotating push files: a slow send can still be reading one while the next is written
 local nav = {}        -- player key -> { data = {...}, at = os.time(), vid = n }
 local resets = {}     -- player key -> resets seen since the player joined
 local keyOf = {}      -- pid -> player key
@@ -64,7 +68,9 @@ local function loadConfig()
   if type(c.url) == "string" then cfg.url = c.url:gsub("/+$", "") end
   if type(c.key) == "string" then cfg.key = c.key end
   if type(c.serverName) == "string" then cfg.serverName = c.serverName end
-  if type(c.intervalMs) == "number" and c.intervalMs >= 1000 and c.intervalMs <= 60000 then cfg.intervalMs = math.floor(c.intervalMs) end
+  if type(c.intervalMs) == "number" and c.intervalMs >= 500 and c.intervalMs <= 60000 then cfg.intervalMs = math.floor(c.intervalMs)
+  elseif c.intervalMs ~= nil then log("intervalMs must be 500 to 60000: using " .. cfg.intervalMs) end
+  if type(c.sampleMs) == "number" and c.sampleMs >= 250 and c.sampleMs < cfg.intervalMs then cfg.sampleMs = math.floor(c.sampleMs) end
   if c.enabled == false then cfg.enabled = false end
   if not cfg.url:match("^https?://") or cfg.key == "" or cfg.key == "CHANGE-ME" then
     log("data/config.json needs url (https://…) and key: live data is off until then")
@@ -88,6 +94,12 @@ local function loadRoutes()
     end
   end
 end
+
+-- the timer runs at the sample rate; every Nth tick sends
+local function tickMs() return cfg.sampleMs > 0 and cfg.sampleMs or cfg.intervalMs end
+local function ticksPerSend() return math.max(1, math.floor(cfg.intervalMs / tickMs() + 0.5)) end
+local tickCount = 0
+local track = {}      -- player key -> positions sampled since the last send (sample mode)
 
 local function checkCurl()
   local f = io.popen(isWin and "curl --version 2>NUL" or "curl --version 2>/dev/null")
@@ -114,7 +126,7 @@ function onInit()
   MP.RegisterEvent("baja75live_nav", "b75live_onNav")
   MP.RegisterEvent("onConsoleInput", "b75live_onConsole")
   MP.RegisterEvent("b75live_tick", "b75live_tick")
-  MP.CreateEventTimer("b75live_tick", cfg.intervalMs)
+  MP.CreateEventTimer("b75live_tick", tickMs())
   log("v" .. VERSION .. " ready" .. (cfg.enabled and "" or " (disabled in config)"))
 end
 
@@ -168,8 +180,9 @@ function b75live_onConsole(input)
   if type(input) ~= "string" or not input:match("^%s*b75live") then return end
   local active = 0
   for _, v in pairs(nav) do if now() - v.at < 10 then active = active + 1 end end
-  return string.format("%s v%s · relay %s · key %s · curl %s · Nav Units reporting %d · last send: %s",
-    PLUGIN, VERSION, cfg.url ~= "" and cfg.url or "(not set)", cfg.key ~= "" and "set" or "(not set)",
+  return string.format("%s v%s · relay %s · key %s · every %d ms%s · curl %s · Nav Units reporting %d · last send: %s",
+    PLUGIN, VERSION, cfg.url ~= "" and cfg.url or "(not set)", cfg.key ~= "" and "set" or "(not set)", cfg.intervalMs,
+    cfg.sampleMs > 0 and (" (positions every " .. cfg.sampleMs .. " ms)") or "",
     curlOk and "ok" or "missing", active, lastStatus ~= "" and lastStatus or "nothing sent yet")
 end
 
@@ -229,7 +242,7 @@ local function readStatus()
 end
 
 local function post(body)
-  seq = (seq % 3) + 1                                     -- rotate files: the previous send may still be running
+  seq = (seq % FILES) + 1                                 -- rotate files: earlier sends may still be running
   local file = DATA .. "/tmp/push" .. seq .. ".json"
   if not writeFile(file, body) then log("can't write " .. file); return end
   local hdr = DATA .. "/tmp/auth.txt"
@@ -240,12 +253,41 @@ local function post(body)
   if isWin then os.execute('start "" /B cmd /C "' .. cmd .. ' 2>NUL"') else os.execute(cmd .. " 2>/dev/null &") end
 end
 
+-- reads a car's position now (sample mode keeps the in-between ones for the next send)
+local function sampleAll()
+  for pid in pairs(MP.GetPlayers() or {}) do
+    local k = keyOf[pid] or playerKey(pid)
+    keyOf[pid] = k
+    local navd = nav[k]
+    local vehicles = MP.GetPlayerVehicles(pid) or {}
+    local vid = navd and navd.vid
+    if vid == nil or vehicles[vid] == nil then vid = nil; for v in pairs(vehicles) do if vid == nil or v < vid then vid = v end end end
+    if vid ~= nil then
+      local pos, err = MP.GetPositionRaw(pid, vid)
+      if err == "" and type(pos) == "table" and type(pos.pos) == "table" then
+        local t = track[k] or {}
+        if #t < 20 then t[#t + 1] = { pos.pos[1], pos.pos[2] } end
+        track[k] = t
+      end
+    end
+  end
+end
+
 function b75live_tick()
-  readStatus()
+  tickCount = tickCount + 1
+  local sending = tickCount % ticksPerSend() == 0
+  if sending then readStatus() end
   if not cfg.enabled or not curlOk or cfg.key == "" or cfg.key == "CHANGE-ME" or not cfg.url:match("^https?://") then return end
   -- only while a race is on: a Navigation Unit reported in the last 10 minutes
-  if lastNavAt == 0 or now() - lastNavAt > 600 then return end
+  if lastNavAt == 0 or now() - lastNavAt > 600 then track = {}; return end
+  if not sending then sampleAll(); return end
   local payload = { v = 1, server = cfg.serverName ~= "" and cfg.serverName or (MP.Get(MP.Settings.Name) or ""), map = "", t = now(), players = collect() }
+  -- positions sampled between sends travel with the player as "track" (oldest first); "pos" is the newest
+  for _, p in ipairs(payload.players) do
+    local k = keyOf[p.pid]
+    if k and track[k] and #track[k] > 0 then p.track = track[k] end
+  end
+  track = {}
   local map = MP.Get(MP.Settings.Map) or ""
   payload.map = map:match("/levels/([^/]+)/") or map
   if now() - lastRouteSend >= 60 then

@@ -1,6 +1,6 @@
 // Baja75 live timing: the race state kept by the relay. Pure functions, no Cloudflare APIs, so they are unit-tested.
 //
-// The BeamMP server plugin (Baja75Live) pushes every player on the server every ~3 s. Players whose Navigation Unit
+// The BeamMP server plugin (Baja75Live) pushes every player on the server every second (configurable). Players whose Navigation Unit
 // reports a run on a course are grouped into a race per course (and map, and day). Each driver's positions are kept as
 // a trail; together the trails draw the route on the live map, even without a route file.
 
@@ -18,6 +18,8 @@ export interface NavReport {
 export interface PushPlayer {
   pid?: number; name: string; beammp?: string; vehicle?: string;
   pos?: [number, number, number]; speed?: number; heading?: number;
+  /** positions sampled since the previous push, oldest first (plugin sample mode); pos is the newest */
+  track?: [number, number][];
   /** resets counted by the server (onVehicleReset) since the player joined */
   resets?: number;
   nav?: NavReport | null;
@@ -63,7 +65,10 @@ export const LIMITS = {
   keepEndedMs: 48 * 60 * 60 * 1000,
   /** a trail point is only added after the car moved this far (metres) */
   trailStepM: 12,
-  maxTrailPoints: 4000,
+  maxTrailPoints: 8000,
+  /** trails are stored in chunks of this many points; the oldest whole chunk goes when a trail is full */
+  trailChunk: 1000,
+  maxTrackPoints: 20,
   maxPlayers: 128,
   maxRoutePoints: 20000,
 };
@@ -101,7 +106,8 @@ export function cleanPayload(raw: unknown): PushPayload | null {
         number: str(n.number, 8) || undefined, unit: str(n.unit, 40) || undefined,
       };
     }
-    players.push({ pid: num(x.pid, 0, 10000) ?? undefined, name, beammp: str(x.beammp, 40) || undefined, vehicle: str(x.vehicle, 80) || undefined, pos,
+    const track = Array.isArray(x.track) ? x.track.slice(0, LIMITS.maxTrackPoints).filter((q) => Array.isArray(q) && num(q[0]) !== null && num(q[1]) !== null).map((q) => [q[0], q[1]] as [number, number]) : undefined;
+    players.push({ pid: num(x.pid, 0, 10000) ?? undefined, name, beammp: str(x.beammp, 40) || undefined, vehicle: str(x.vehicle, 80) || undefined, pos, track: track?.length ? track : undefined,
       speed: num(x.speed, 0, 500) ?? undefined, heading: num(x.heading, -10, 10) ?? undefined, resets: num(x.resets, 0, 1e6) ?? undefined, nav });
   }
   let routes: PushPayload['routes'];
@@ -132,7 +138,7 @@ function addTrailPoint(hub: Hub, raceId: string, key: string, pt: [number, numbe
   if (last && Math.hypot(pt[0] - last[0], pt[1] - last[1]) < LIMITS.trailStepM) return null;
   const p: [number, number] = [Math.round(pt[0] * 10) / 10, Math.round(pt[1] * 10) / 10];
   list.push(p);
-  if (list.length > LIMITS.maxTrailPoints) list.splice(0, list.length - LIMITS.maxTrailPoints);
+  if (list.length > LIMITS.maxTrailPoints) list.splice(0, LIMITS.trailChunk);
   return p;
 }
 
@@ -238,6 +244,10 @@ function updateDriver(hub: Hub, race: LiveRace, d: LiveDriver, p: PushPlayer, no
   if (p.resets !== undefined) d.serverResets = Math.max(0, p.resets - (hub.resetBase[`${race.id}|${d.key}`] ?? p.resets));
   if (p.speed !== undefined) d.speedKmh = Math.round(p.speed * 3.6);
   if (p.heading !== undefined) d.heading = p.heading;
+  for (const q of p.track ?? []) {
+    const pt = addTrailPoint(hub, race.id, d.key, q);
+    if (pt) ((added[race.id] ??= {})[d.key] ??= []).push(pt);
+  }
   if (p.pos) {
     d.pos = [Math.round(p.pos[0] * 10) / 10, Math.round(p.pos[1] * 10) / 10]; d.z = Math.round(p.pos[2]);
     const pt = addTrailPoint(hub, race.id, d.key, d.pos);
